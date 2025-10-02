@@ -1,31 +1,67 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
+import axios from "axios";
 import "./App.css";
+
+const BACKEND_URL = "https://mytodo-backend-o7ar.onrender.com"; // Your live backend
 
 function App() {
   const [task, setTask] = useState("");
   const [tasks, setTasks] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
+  // Fetch all tasks on load
+  useEffect(() => {
+    axios
+      .get(`${BACKEND_URL}/todos`)
+      .then((res) => {
+        setTasks(res.data);
+        setLoading(false);
+      })
+      .catch((err) => {
+        setError("Failed to load tasks. Please check backend.");
+        setLoading(false);
+      });
+  }, []);
+
+  // Add a new task
   const addTask = () => {
     if (task.trim() === "") return;
-    setTasks([...tasks, { text: task, done: false }]);
-    setTask("");
+
+    axios
+      .post(`${BACKEND_URL}/todos`, { text: task })
+      .then((res) => {
+        setTasks([...tasks, res.data]);
+        setTask("");
+      })
+      .catch(() => setError("Failed to add task."));
   };
 
-  const toggleTask = (index) => {
-    const updatedTasks = tasks.map((t, i) =>
-      i === index ? { ...t, done: !t.done } : t
-    );
-    setTasks(updatedTasks);
+  // Toggle completion
+  const toggleTask = (id) => {
+    axios
+      .put(`${BACKEND_URL}/todos/${id}`)
+      .then((res) => {
+        setTasks(tasks.map((t) => (t._id === id ? res.data : t)));
+      })
+      .catch(() => setError("Failed to update task."));
   };
 
-  const deleteTask = (index) => {
-    setTasks(tasks.filter((_, i) => i !== index));
+  // Delete a task
+  const deleteTask = (id) => {
+    axios
+      .delete(`${BACKEND_URL}/todos/${id}`)
+      .then(() => {
+        setTasks(tasks.filter((t) => t._id !== id));
+      })
+      .catch(() => setError("Failed to delete task."));
   };
 
   return (
     <div className="app">
       <h1 className="title">✨ My To-Do List</h1>
 
+      {/* Input */}
       <div className="input-container">
         <input
           type="text"
@@ -36,14 +72,20 @@ function App() {
         <button onClick={addTask}>Add</button>
       </div>
 
+      {/* Error Message */}
+      {error && <p className="error">{error}</p>}
+
+      {/* Task List */}
       <ul className="task-list">
-        {tasks.length === 0 ? (
+        {loading ? (
+          <p className="empty">Loading tasks...</p>
+        ) : tasks.length === 0 ? (
           <p className="empty">No tasks yet. Add something! ✅</p>
         ) : (
-          tasks.map((t, index) => (
-            <li key={index} className={t.done ? "done" : ""}>
-              <span onClick={() => toggleTask(index)}>{t.text}</span>
-              <button className="delete" onClick={() => deleteTask(index)}>
+          tasks.map((t) => (
+            <li key={t._id} className={t.done ? "done" : ""}>
+              <span onClick={() => toggleTask(t._id)}>{t.text}</span>
+              <button className="delete" onClick={() => deleteTask(t._id)}>
                 ✖
               </button>
             </li>
